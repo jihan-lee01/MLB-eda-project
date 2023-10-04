@@ -9,10 +9,16 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Introduction
+Our group is looking at data from the 2022 Major League Baseball (MLB) season. We'd like to compare teams' winnings (or lack thereof) to how much money they spent on paying their players. A unique aspect of the MLB is that they don't have a hard limit (a "salary cap") on how much teams are allowed to spend on their roster's payroll. Thus, we'd like to explore whether or not it is possible to "buy" a good team by simply spending tons of money on the league's best players. 
+
+# Initial Data Exploration
+First, we will import the data:
+
 ```{r}
 library('readxl')
 
-payrollData <- read_excel("data/mlb_payroll_tracker_positional_breakdown_2022.xlsx")
+payrollPosition <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_2022.xlsx")
 
-payrollData <- read_excel("data/mlb_payroll_tracker_roster_breakdown_2022.xlsx")
+payrollRoster <- read_excel("../data/mlb_payroll_tracker_roster_breakdown_2022.xlsx")
 ```
