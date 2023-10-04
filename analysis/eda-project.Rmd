@@ -9,3 +9,10 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+library('readxl')
+
+payrollData <- read_excel("data/mlb_payroll_tracker_positional_breakdown_2022.xlsx")
+
+payrollData <- read_excel("data/mlb_payroll_tracker_roster_breakdown_2022.xlsx")
+```
