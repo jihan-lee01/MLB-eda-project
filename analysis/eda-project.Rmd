@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # Introduction
 Our group is looking at data from the 2022 Major League Baseball (MLB) season. We'd like to compare teams' winnings (or lack thereof) to how much money they spent on paying their players. A unique aspect of the MLB is that they don't have a hard limit (a "salary cap") on how much teams are allowed to spend on their roster's payroll. Thus, we'd like to explore whether or not it is possible to "buy" a good team by simply spending tons of money on the league's best players. 
 
-# Initial Data Exploration
+# Data
 First, we will import the data:
 
 ```{r}
@@ -22,3 +22,39 @@ payrollPosition <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_
 
 payrollRoster <- read_excel("../data/mlb_payroll_tracker_roster_breakdown_2022.xlsx")
 ```
+
+Our data is comprised of two different data sets. Both are organized by the 30 MLB teams. The `payrollPosition` data breaks down payroll by different groups of defensive positions. 
+
+### Cleaning
+The first step of data cleaning that we'll perform is removing the `LEAGUE AVERAGE` value in `payrollRoster`. While this is a useful piece of information, we'd like to remove it in order to make our data much cleaner and not have a confusing row that isn't particularly relevant to its surrounding data.
+```{r}
+library('tidyverse')
+
+payrollRoster <- payrollRoster %>%
+  filter(RANK != 'LEAGUE AVERAGE')
+```
+
+The next piece of data cleaning is to combine the two data sets into a nice, singular data set. We'll utilize the `full_join()` method to accomplish this. One quick fix that must be made first is to convert the `RANK` variable in `payrollRoster` from a decimal number to an integer.
+
+```{r}
+payrollRoster$RANK <- as.integer(payrollRoster$RANK)
+payrollData <- full_join(payrollPosition, payrollRoster, by = c('TEAM', 'RANK', 'ROSTER'))
+```
+
+We'll now clean up the data further by removing variables that are named differently but are duplicates of each other.
+
+```{r}
+payrollData <- payrollData %>%
+  select('RANK', 'TEAM', 'WIN %', 'ROSTER', 'CATCHER $',
+         'INFIELD $', 'OUTFIELD $', 'DH $', 'PITCHING $',
+         'TOTAL PAYROLL', '26-MAN PAYROLL', 'INJURED RESERVE', 'RETAINED', 'BURIED')
+```
+
+### Overview
+Now that we've cleaned the data, we can start to learn more about each variable. While we won't cover every variable right now, we'll highlight the ones that we believe to be the most important. 
+* `RANK` - This ranks the teams, from 1-30, in terms of their overall payroll.
+* `TEAM` - This is the team's name.
+* `WIN %` - Percentage of games the team won in the 2022 regular season.
+* `ROSTER` - The number of players on the team's roster.
+* `TOTAL PAYROLL` - The total amount of money the team spent on their roster.
+* `26-MAN PAYROLL` - The amount of money the team spent on their 26-man roster, which normalizes payroll regardless of total members of their roster. 
