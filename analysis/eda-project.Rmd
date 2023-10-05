@@ -13,9 +13,11 @@ knitr::opts_chunk$set(echo = TRUE)
 Our group is looking at data from the 2022 Major League Baseball (MLB) season. We'd like to compare teams' winnings (or lack thereof) to how much money they spent on paying their players. A unique aspect of the MLB is that they don't have a hard limit (a "salary cap") on how much teams are allowed to spend on their roster's payroll. Thus, we'd like to explore whether or not it is possible to "buy" a good team by simply spending tons of money on the league's best players. 
 
 # Data
+We collected data from spotrac MLB Team Payroll Tracker from https://www.spotrac.com/mlb/payroll/2022/.
+
 First, we will import the data:
 
-```{r}
+```{r import datasets, warning=FALSE}
 library('readxl')
 
 payrollPosition <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_2022.xlsx")
@@ -27,7 +29,8 @@ Our data is comprised of two different data sets. Both are organized by the 30 M
 
 ### Cleaning
 The first step of data cleaning that we'll perform is removing the `LEAGUE AVERAGE` value in `payrollRoster`. While this is a useful piece of information, we'd like to remove it in order to make our data much cleaner and not have a confusing row that isn't particularly relevant to its surrounding data.
-```{r}
+
+```{r filter, warning=FALSE, message=FALSE}
 library('tidyverse')
 
 payrollRoster <- payrollRoster %>%
@@ -36,25 +39,105 @@ payrollRoster <- payrollRoster %>%
 
 The next piece of data cleaning is to combine the two data sets into a nice, singular data set. We'll utilize the `full_join()` method to accomplish this. One quick fix that must be made first is to convert the `RANK` variable in `payrollRoster` from a decimal number to an integer.
 
-```{r}
+```{r merge datasets}
 payrollRoster$RANK <- as.integer(payrollRoster$RANK)
 payrollData <- full_join(payrollPosition, payrollRoster, by = c('TEAM', 'RANK', 'ROSTER'))
 ```
 
 We'll now clean up the data further by removing variables that are named differently but are duplicates of each other.
 
-```{r}
+```{r select variables}
 payrollData <- payrollData %>%
   select('RANK', 'TEAM', 'WIN %', 'ROSTER', 'CATCHER $',
          'INFIELD $', 'OUTFIELD $', 'DH $', 'PITCHING $',
          'TOTAL PAYROLL', '26-MAN PAYROLL', 'INJURED RESERVE', 'RETAINED', 'BURIED')
 ```
 
+We will rename variables for the sake of consistency and easeness of the analysis later on.
+
+```{r rename variables}
+payrollData <- payrollData %>%
+  rename(
+    rank = 'RANK',
+    team = 'TEAM',
+    winPercentage = 'WIN %',
+    roster = 'ROSTER',
+    catcher = 'CATCHER $', 
+    infield = 'INFIELD $',
+    outfield = 'OUTFIELD $',
+    dh = 'DH $',
+    pitching = 'PITCHING $',
+    total = 'TOTAL PAYROLL',
+    normalized = '26-MAN PAYROLL',
+    injuredReserve = 'INJURED RESERVE',
+    retained = 'RETAINED',
+    buried = 'BURIED'
+  )
+```
+
+
 ### Overview
 Now that we've cleaned the data, we can start to learn more about each variable. While we won't cover every variable right now, we'll highlight the ones that we believe to be the most important. 
-* `RANK` - This ranks the teams, from 1-30, in terms of their overall payroll.
-* `TEAM` - This is the team's name.
-* `WIN %` - Percentage of games the team won in the 2022 regular season.
-* `ROSTER` - The number of players on the team's roster.
-* `TOTAL PAYROLL` - The total amount of money the team spent on their roster.
-* `26-MAN PAYROLL` - The amount of money the team spent on their 26-man roster, which normalizes payroll regardless of total members of their roster. 
+
+* `rank` - This ranks the teams, from 1-30, in terms of their overall payroll.
+* `team` - This is the team's name.
+* `winPercentage` - Percentage of games the team won in the 2022 regular season.
+* `roster` - The number of players on the team's roster.
+* `total` - The total amount of money the team spent on their roster.
+* `normalized` - The amount of money the team spent on their 26-man roster, which normalizes payroll regardless of total members of their roster. 
+
+### Descriptive Statistics
+
+```{r descriptive statistics}
+meanTotal <- format(round(mean(payrollData$total), 2), nsmall = 2)
+medianTotal <- format(round(median(payrollData$total), 2), nsmall = 0)
+sdTotal <- format(round(sd(payrollData$total), 2), nsmall = 2)
+```
+
+The average of Total Payroll amount is **$`r meanTotal`**, the median is **$`r medianTotal`**, and standard deviation is **$`r sdTotal`**.
+
+### Distributions
+
+```{r import ggplot2, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(ggthemes)
+theme_set(theme_clean())
+```
+
+#### Histogram
+
+```{r histogram, warning=FALSE, message=FALSE}
+ggplot(payrollData, aes(x=total)) +
+  geom_histogram(fill="blue", color="black") +
+  labs(x="Total Payroll", y="Frequency", title="Distribution of Total Payroll Amount") +
+  scale_x_continuous(labels = scales::dollar_format(scale = 1e-6, prefix = "$", suffix = "M"), breaks = seq(0, 300000000, 50000000))
+```
+
+#### Box Plot
+
+```{r boxplot, warning=FALSE}
+ggplot(payrollData, aes(x=total)) +
+  geom_boxplot(fill="blue", color="black") +
+  labs(x="Total Payroll", title="Box Plot of Total Payroll Amount") +
+  scale_x_continuous(labels = scales::dollar_format(scale = 1e-6, prefix = "$", suffix = "M"), breaks = seq(0, 300000000, 50000000))
+```
+
+#### Bar Chart
+
+```{r bar chart, warning=FALSE}
+ggplot(payrollData, aes(x=factor(team), y=total)) +
+  geom_bar(stat="identity", fill="blue") +
+  labs(x="Team", y="Total Payroll", title="Bar Chart of Total Payroll Amount by Team") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), plot.margin = unit(c(0.1, 0.3, 0.1, 0.3), "inches")) +
+  scale_y_continuous(labels = scales::dollar_format(scale = 1e-6, prefix = "$", suffix = "M"), breaks = seq(0, 300000000, 50000000))
+```
+
+#### Scatter Plot
+
+```{r scatter plot, warning=FALSE, message=FALSE}
+ggplot(payrollData, aes(x=total, y=winPercentage)) +
+  geom_point(color="blue") +
+  geom_smooth(method=lm) +
+  labs(x="Total Payroll", y="Win %", title="Total Payroll vs Win Percentage") +
+  scale_x_continuous(labels = scales::dollar_format(scale = 1e-6, prefix = "$", suffix = "M"), breaks = seq(0, 300000000, 50000000))
+```
