@@ -1,5 +1,5 @@
 ---
-title: "EDA Project"
+title: "Payroll vs. Teams' Success in Baseball"
 author: "Calvin Brauer, Jihan Lee"
 date: "`r Sys.Date()`"
 output: html_document
@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 Our group is looking at data from the 2022 Major League Baseball (MLB) season. We'd like to compare teams' winnings (or lack thereof) to how much money they spent on paying their players. A unique aspect of the MLB is that they don't have a hard limit (a "salary cap") on how much teams are allowed to spend on their roster's payroll. Thus, we'd like to explore whether or not it is possible to "buy" a good team by simply spending tons of money on the league's best players. 
 
 # Data
-We collected data from spotrac MLB Team Payroll Tracker from https://www.spotrac.com/mlb/payroll/2022/.
+We collected data from spotrac MLB Team Payroll Tracker from https://www.spotrac.com/mlb/payroll/2022/. This data contains the payroll information for all 30 MLB teams from the 2022 season, organized in a few different ways. We'll explore this further later. In terms of ethical considerations, we believe that this data is ethical, as MLB teams are required to report salaries in order to promote transparency throughout the league. Thus, all of this data was already available to the general public and our source kindly compiled it into a nice, usable format. 
 
 First, we will import the data:
 
@@ -32,6 +32,7 @@ The first step of data cleaning that we'll perform is removing the `LEAGUE AVERA
 
 ```{r filter, warning=FALSE, message=FALSE}
 library('tidyverse')
+library('knitr')
 
 payrollRoster <- payrollRoster %>%
   filter(RANK != 'LEAGUE AVERAGE')
@@ -53,7 +54,7 @@ payrollData <- payrollData %>%
          'TOTAL PAYROLL', '26-MAN PAYROLL', 'INJURED RESERVE', 'RETAINED', 'BURIED')
 ```
 
-We will rename variables for the sake of consistency and easeness of the analysis later on.
+We will rename variables for the sake of consistency and easiness of the analysis later on.
 
 ```{r rename variables}
 payrollData <- payrollData %>%
@@ -141,3 +142,54 @@ ggplot(payrollData, aes(x=total, y=winPercentage)) +
   labs(x="Total Payroll", y="Win %", title="Total Payroll vs Win Percentage") +
   scale_x_continuous(labels = scales::dollar_format(scale = 1e-6, prefix = "$", suffix = "M"), breaks = seq(0, 300000000, 50000000))
 ```
+
+# Analysis
+### Above average pay and wins
+We'll first look at a list of teams that had both above average payroll and above average winning percentages.
+
+```{r}
+payrollData %>%
+  filter(total > mean(total)) %>%
+  filter(winPercentage > mean(winPercentage)) %>% 
+  kable()
+```
+
+There were seven total teams that had both an above average payroll and an above average winning percentage. One thing to notice is that all three of the highest payrolls had above average winning percentages. 
+
+### Below average pay and below average wins
+Much like above, we'll look at teams that had below average payroll and wins.
+
+```{r}
+payrollData %>%
+  filter(total < mean(total)) %>%
+  filter(winPercentage < mean(winPercentage)) %>%
+  kable()
+```
+
+Interestingly, there were nine teams with both a below average payroll and a below average winning percentage. However unlike with the teams that were above average in both of the aforementioned categories, there is much more of a spread in terms of rankings among these teams. For example, the Baltimore Orioles had the lowest payroll across the entire MLB, yet still won an above average amount of games, winning about 52% of the games they played in the season. With that being said, most of the below average teams did also have lower payrolls, such as the dreadful Washington Nationals who had the 10th lowest payroll and finished dead last, winning barely over a third of their games. 
+
+### Teams that were "unlucky"
+One unpredictable element of sports is injuries. Sometimes teams can get very unlucky with injuries and have some of their best players (who are generally the highest paid) have long term injuries in which they're unable to play for large amounts of the season. When players are injured, they can be placed on the injured reserve list, freeing up a roster spot for another player who is healthy to take their place. We'll compare the percentage of payroll that goes towards injured reserve players to a team's total winning percentage. 
+```{r warning = FALSE, message = FALSE}
+payrollData %>%
+  summarize(pctIR = injuredReserve / total) %>%
+  ggplot(aes(x=pctIR, y = payrollData$winPercentage)) +
+  geom_point(color="blue") +
+  geom_smooth(method=lm) +
+  labs(x="% of Payroll Towards Injured Reserve", y="Win %", title="Injured Reserve Payroll vs Win Percentage")
+```
+
+There appears to be a weak negative correlation between injured reserve utilization and win percentage. With that being said, the trend line is downward sloping, so there is at least some indication that having more of your payroll going towards injured reserve players can lead to poorer performance. 
+
+### What defines success?
+Throughout this exploration, we've primarily defined success in terms of winning percentage. However, is this the best metric to use? While having the most wins in the regular season is great, history remembers championship wins, rather than regular season wins. The Houston Astros won the 2022 MLB World Series over the Philadelphia Phillies. 
+
+```{r}
+payrollData %>%
+  filter(team == 'Houston Astros' | team == 'Philadelphia Phillies') %>%
+  kable()
+```
+
+While this table may not be the most exciting, it does provide some valuable insight: The richest teams (i.e. the ones that spend the most money on their players) are far from guaranteed to be the most successful at winning a World Series. Neither of the two finalists were in the top 3 highest payrolls for the season, with the eventual champion Astros being eighth overall, which is very much in the middle of the pack considering that there are only 30 teams in the league. 
+
+# Further Research
