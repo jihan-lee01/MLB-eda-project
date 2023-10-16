@@ -193,3 +193,5 @@ payrollData %>%
 While this table may not be the most exciting, it does provide some valuable insight: The richest teams (i.e. the ones that spend the most money on their players) are far from guaranteed to be the most successful at winning a World Series. Neither of the two finalists were in the top 3 highest payrolls for the season, with the eventual champion Astros being eighth overall, which is very much in the middle of the pack considering that there are only 30 teams in the league. 
 
 # Further Research
+
+In terms of further research, we think that it would be very interesting to consider more seasons in our studies. While it appears that payroll wasn't the defining factor in the 2022 season, we'd like to take a look at more seasons to see if over time there has been an impact or if there are any other trends that would be amplified by more data. Something else to consider is the 2020 season. This was a shortened season due to the COVID-19 pandemic, so it would be interesting to see if there was any advantage to playing less games and which types of teams this benefited the most and least. 
