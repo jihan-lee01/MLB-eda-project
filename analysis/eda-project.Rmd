@@ -1,5 +1,5 @@
 ---
-title: "Payroll vs. Teams' Success in Baseball"
+title: "Payroll and Team's Success in Major League Baseball"
 author: "Calvin Brauer, Jihan Lee"
 date: "`r Sys.Date()`"
 output: html_document
@@ -10,12 +10,18 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # Introduction
-Our group is looking at data from the 2022 Major League Baseball (MLB) season. We'd like to compare teams' winnings (or lack thereof) to how much money they spent on paying their players. A unique aspect of the MLB is that they don't have a hard limit (a "salary cap") on how much teams are allowed to spend on their roster's payroll. Thus, we'd like to explore whether or not it is possible to "buy" a good team by simply spending tons of money on the league's best players. 
+In our analysis, we are examining data from the 2022 Major League Baseball (MLB) season, specifically focusing on the correlation between team expenditures on player salaries and their on-field performance. One distinctive feature of the MLB, compared to other American professional sports leagues, is the absence of a strict salary cap. This absence raises an intriguing question: Is it feasible for teams to achieve success merely by allocating substantial financial resources to secure top-tier players? Our analysis aims to ascertain the extent to which financial investment in player payroll translates to on-field victories.
 
 # Data
-We collected data from spotrac MLB Team Payroll Tracker from https://www.spotrac.com/mlb/payroll/2022/. This data contains the payroll information for all 30 MLB teams from the 2022 season, organized in a few different ways. We'll explore this further later. In terms of ethical considerations, we believe that this data is ethical, as MLB teams are required to report salaries in order to promote transparency throughout the league. Thus, all of this data was already available to the general public and our source kindly compiled it into a nice, usable format. 
+In our exploration, we delve into a dataset sourced from spotrac, specifically from their 2022 Major League Baseball (MLB) payroll page (https://www.spotrac.com/mlb/payroll/2022/). This dataset provides a snapshot of the payroll details for all 30 MLB teams for the year 2022. 
 
-First, we will import the data:
+It is pertinent to note that while our aim was to utilize the most up-to-date data, we opted for the 2022 dataset as it represents the most recent complete season. The 2023 season data, being still in progress, was excluded from our analysis. However, it is essential to understand that the chosen 2022 season, while being the most recent complete set, does not necessarily possess representativeness for all preceding seasons nor holds predictive power for subsequent ones.
+
+Given its origin, it is crucial to note an ethical consideration: the data was scraped from the internet. As such, while the data in its original context serves the purpose of promoting transparency in the league, we emphasize that our use of it is strictly for personal exploration and insights, and any commercial exploitation should be approached with caution and due consideration.
+
+With a modest size of only 30 data points, our dataset is relatively concise, yet it appears to be well-organized, requiring minimal pre-processing. Anticipating our exploration, the only significant data cleaning that might be needed is the renaming of specific columns or data points to facilitate clearer analysis. Through this exploratory data analysis, our aim is to uncover patterns, anomalies, and potential insights that might be latent in the MLB payroll figures for 2022.
+
+To initiate our comprehensive analysis of the 2022 MLB Team Payroll, we should start by importing the datasets.
 
 ```{r import datasets, warning=FALSE}
 library('readxl')
@@ -25,10 +31,10 @@ payrollPosition <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_
 payrollRoster <- read_excel("../data/mlb_payroll_tracker_roster_breakdown_2022.xlsx")
 ```
 
-Our data is comprised of two different data sets. Both are organized by the 30 MLB teams. The `payrollPosition` data breaks down payroll by different groups of defensive positions. 
+The data is derived from two distinct but similar datasets, each structured around the 30 MLB teams. The `payrollPosition` dataset breaks down payroll according to various defensive position groupings, whereas the `payrollRoster` dataset categorizes payroll based on different roster classifications.
 
-### Cleaning
-The first step of data cleaning that we'll perform is removing the `LEAGUE AVERAGE` value in `payrollRoster`. While this is a useful piece of information, we'd like to remove it in order to make our data much cleaner and not have a confusing row that isn't particularly relevant to its surrounding data.
+## Pre-processing
+In our data pre-processing, we have identified a specific entry labeled `LEAGUE AVERAGE` within the `payrollRoster` dataset. While this entry provides a valuable benchmark by offering an average across the league, its inclusion may introduce ambiguity, especially when conducting team-specific analyses. To ensure the clarity of our data and to avoid potential misinterpretations or skewness in subsequent analyses, we eliminated this entry. By doing so, we aim to maintain a dataset that solely represents individual team figures.
 
 ```{r filter, warning=FALSE, message=FALSE}
 library('tidyverse')
@@ -38,14 +44,14 @@ payrollRoster <- payrollRoster %>%
   filter(RANK != 'LEAGUE AVERAGE')
 ```
 
-The next piece of data cleaning is to combine the two data sets into a nice, singular data set. We'll utilize the `full_join()` method to accomplish this. One quick fix that must be made first is to convert the `RANK` variable in `payrollRoster` from a decimal number to an integer.
+The subsequent task is combining the two datasets to yield a singular dataset `payrollData`. To merge two datasets, we will use the `full_join()` method. However, prior to this integration, it is important to address an inconsistency: the `RANK` variable within the `payrollRoster` dataset is currently represented as a decimal number.Thus, we will transform the `RANK` variable to an integer format.
 
 ```{r merge datasets}
 payrollRoster$RANK <- as.integer(payrollRoster$RANK)
 payrollData <- full_join(payrollPosition, payrollRoster, by = c('TEAM', 'RANK', 'ROSTER'))
 ```
 
-We'll now clean up the data further by removing variables that are named differently but are duplicates of each other.
+We will now clean up the data further by eliminating variables that are named differently but are essentially duplicates of each other.
 
 ```{r select variables}
 payrollData <- payrollData %>%
@@ -54,7 +60,7 @@ payrollData <- payrollData %>%
          'TOTAL PAYROLL', '26-MAN PAYROLL', 'INJURED RESERVE', 'RETAINED', 'BURIED')
 ```
 
-We will rename variables for the sake of consistency and easiness of the analysis later on.
+For the purpose of ensuring consistency and facilitating subsequent analysis, we will standardize the naming of variables. To achieve this, we have adopted the camelCase naming convention.
 
 ```{r rename variables}
 payrollData <- payrollData %>%
@@ -76,76 +82,160 @@ payrollData <- payrollData %>%
   )
 ```
 
+To ensure data integrity and consistency, it is necessary to verify that each variable is of the appropriate class. The `sapply()` method provides a concise display for this purpose.
 
-### Overview
-Now that we've cleaned the data, we can start to learn more about each variable. While we won't cover every variable right now, we'll highlight the ones that we believe to be the most important. 
+```{r check classes of varible}
+sapply(payrollData, class)
+```
+Upon examining the output, it is evident that most variables align with their expected classes. However, there is an exception with the `dh` variable, which is currently of class "character" but should ideally be "numeric". We will proceed to fix this discrepancy by adjusting the data class of this variable.
 
-* `rank` - This ranks the teams, from 1-30, in terms of their overall payroll.
-* `team` - This is the team's name.
-* `winPercentage` - Percentage of games the team won in the 2022 regular season.
-* `roster` - The number of players on the team's roster.
-* `total` - The total amount of money the team spent on their roster.
-* `normalized` - The amount of money the team spent on their 26-man roster, which normalizes payroll regardless of total members of their roster. 
+```{r change variable class, warning=FALSE}
+payrollData$dh <- as.numeric(payrollData$dh)
+```
 
-### Descriptive Statistics
+## Overview of Varibales
+As we have pre-processed the data, we can now delve deeper into understanding the individual variables. While a comprehensive exploration of every variable is beyond the scope of this initial overview, we will emphasize those variables with most significance:
 
-```{r descriptive statistics}
+* `rank`: Represents the team's standing, numerically ranging from 1 to 30, based on the magnitude of their overall payroll.
+* `team`: Denotes the official name of the MLB team.
+* `winPercentage`: Shows the proportion of games won by the team during the 2022 regular season.
+* `roster`: Quantifies the total number of players within the team's roster.
+* `total`: Reflects the total amount of salary spent by the team towards their roster for the year.
+* `normalized`: Signifies the amount of salary associated with the team's 26-man roster, ensuring a normalized payroll comparison irrespective of the total roster size.
+
+## Central Tendency Measures and Descriptive Statistics
+
+```{r central tendency measures}
 meanTotal <- format(round(mean(payrollData$total), 2), nsmall = 2)
 medianTotal <- format(round(median(payrollData$total), 2), nsmall = 0)
 sdTotal <- format(round(sd(payrollData$total), 2), nsmall = 2)
 ```
 
-The average of Total Payroll amount is **$`r meanTotal`**, the median is **$`r medianTotal`**, and standard deviation is **$`r sdTotal`**.
+The payroll landscape of the MLB teams for the 2022 season can be summarized through a few key descriptive statistics:
 
-### Distributions
+* Average (Mean) Total Payroll: The arithmetic mean provides a central value, giving us a general idea of the typical team payroll. For our dataset, the average payroll stands at **$`r meanTotal`**. This figure indicates the central tendency of the payroll data and offers a reference point against which individual team payrolls can be compared.
+
+* Median Total Payroll: The median, being the middle value when all numbers are sorted in ascending or descending order, is less sensitive to extreme values or outliers than the mean. The median payroll for our dataset is **$`r medianTotal`**, suggesting that half of the MLB teams spent more than this amount and half spent less. The comparison between the mean and median can also provide insights into the skewness of the distribution. Given that the average total payroll exceeds the median, this suggests a slight right-skew in the data. This skewness implies the presence of certain teams that have significantly higher payrolls, which pull the overall average upwards. These outliers indicate a disparity where a select few teams allocate considerably more funds than the majority.
+
+* Standard Deviation of Total Payroll: The standard deviation quantifies the extent to which individual payrolls deviate from the mean. A higher standard deviation indicates a wider dispersion of values around the mean. In our dataset, the standard deviation is **$`r sdTotal`**. This value gives us an indication of the variability or spread of the team payrolls around the average.
+
+Now we will delve into the summary statistics for the variables contained within this dataset.
+
+```{r summary statistics}
+summary(payrollData)
+```
+
+By understanding these metrics, we can gain a deeper evaluation of the financial dynamics and variations across different MLB teams in the 2022 season.
+
+## Distributions of Data
+Visualizing the various distributions within our dataset will offer distinct insights, guiding our analytical approach. Before delving into this, we must first import the necessary packages to facilitate such visualizations.
 
 ```{r import ggplot2, message=FALSE, warning=FALSE}
 library(ggplot2)
 library(ggthemes)
+library(gridExtra)
 theme_set(theme_clean())
 ```
 
-#### Histogram
+### Boxplots
+While the variables we are focusing on are continuous in nature, our primary objective is to compare across categories rather than to assess data frequency or density. Consequently, we will employ boxplots to depict the data distribution. Each variable is represented on the x-axis, and we have adjusted the scale according to the minimum and maximum values of each variable using the summary statistics above.
 
 ```{r histogram, warning=FALSE, message=FALSE}
-ggplot(payrollData, aes(x=total)) +
-  geom_histogram(fill="blue", color="black") +
-  labs(x="Total Payroll", y="Frequency", title="Distribution of Total Payroll Amount") +
+ggplot(payrollData, aes(x=winPercentage)) + 
+  geom_boxplot(fill="#002D72", color="#D50032") + 
+  labs (x="Win Percentage", title="Distribution of Win Percentage")
+
+p1 <- ggplot(payrollData, aes(x=total)) +
+  geom_boxplot(fill="#002D72", color="#D50032") +
+  labs(x="Total Payroll", title="Total Payroll") +
   scale_x_continuous(labels = scales::dollar_format(scale = 1e-6, prefix = "$", suffix = "M"), breaks = seq(0, 300000000, 50000000))
+
+p2 <- ggplot(payrollData, aes(x=normalized)) +
+  geom_boxplot(fill="#002D72", color="#D50032") +
+  labs(x="26-Man Payroll", title="26-Man Payroll") +
+  scale_x_continuous(labels = scales::dollar_format(scale = 1e-6, prefix = "$", suffix = "M"), breaks = seq(0, 300000000, 50000000))
+
+grid.arrange(p1, p2, ncol = 1)
+
+p3 <- ggplot(payrollData, aes(x=catcher)) +
+  geom_boxplot(fill="#002D72", color="#D50032") +
+  labs(x="Catcher Payroll", title="Catchers") +
+  scale_x_continuous(labels = scales::dollar_format(scale = 1e-6, prefix = "$", suffix = "M"), breaks = seq(0, 30000000, 5000000))
+
+p4 <- ggplot(payrollData, aes(x=infield)) +
+  geom_boxplot(fill="#002D72", color="#D50032") +
+  labs(x="Infielder Payroll", title="Infielders") +
+  scale_x_continuous(labels = scales::dollar_format(scale = 1e-6, prefix = "$", suffix = "M"), breaks = seq(0, 80000000, 5000000))
+
+p5 <- ggplot(payrollData, aes(x=outfield)) +
+  geom_boxplot(fill="#002D72", color="#D50032") +
+  labs(x="Outfielder Payroll", title="Outfielders") +
+  scale_x_continuous(labels = scales::dollar_format(scale = 1e-6, prefix = "$", suffix = "M"), breaks = seq(0, 70000000, 5000000))
+
+p6 <- ggplot(payrollData, aes(x=dh)) +
+  geom_boxplot(fill="#002D72", color="#D50032") +
+  labs(x="DH Payroll", title="Designated Hitters") +
+  scale_x_continuous(labels = scales::dollar_format(scale = 1e-6, prefix = "$", suffix = "M"), breaks = seq(0, 40000000, 5000000))
+
+p7 <- ggplot(payrollData, aes(x=pitching)) +
+  geom_boxplot(fill="#002D72", color="#D50032") +
+  labs(x="Pitcher Payroll", title="Pitchers") +
+  scale_x_continuous(labels = scales::dollar_format(scale = 1e-6, prefix = "$", suffix = "M"), breaks = seq(0, 200000000, 25000000))
+
+grid.arrange(p7, p3, ncol = 1)
+grid.arrange(p4, p5, p6, ncol = 1)
 ```
 
-#### Box Plot
+From the presented graphs, several observations can be drawn:
 
-```{r boxplot, warning=FALSE}
-ggplot(payrollData, aes(x=total)) +
-  geom_boxplot(fill="blue", color="black") +
-  labs(x="Total Payroll", title="Box Plot of Total Payroll Amount") +
-  scale_x_continuous(labels = scales::dollar_format(scale = 1e-6, prefix = "$", suffix = "M"), breaks = seq(0, 300000000, 50000000))
-```
+* Win Percentages: These appear to be symmetrically distributed around a median of 0.5, suggesting a balanced performance distribution among teams.
+* Total Payroll: The data seems to center around $150 million, indicating a relatively even allocation of payroll across teams.
+* 26-Man Payroll: Serving as a standardized measure of payroll, this shows a slight right-skew. This suggests the presence of a few teams with significantly higher payrolls compared to the rest.
+* Positional Breakdown of Payroll Distributions: Payrolls for specific positions tend to be right-skewed. Given the near-symmetrical distribution of the total payroll, this might infer that teams vary in their financial allocation to different positions.
+* Catcher Payroll: It is worth noting the presence of an outlier in the catcher payroll distribution, which might warrant further investigation.
 
-#### Bar Chart
+These insights provide a nuanced understanding of team expenditures and their distribution strategies.
+
+### Bar Chart
+To discern which teams allocate the highest and lowest amounts to their team salaries, we will produce a sorted bar chart.
 
 ```{r bar chart, warning=FALSE}
-ggplot(payrollData, aes(x=factor(team), y=total)) +
-  geom_bar(stat="identity", fill="blue") +
-  labs(x="Team", y="Total Payroll", title="Bar Chart of Total Payroll Amount by Team") +
+ggplot(payrollData, aes(x=reorder(factor(team), normalized), y=normalized)) +
+  geom_bar(stat="identity", fill="#002D72", color="#D50032") +
+  labs(x="Team", y="26-Man Payroll", title="Bar Chart of 26-Man Payroll Amount by Team") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1), plot.margin = unit(c(0.1, 0.3, 0.1, 0.3), "inches")) +
   scale_y_continuous(labels = scales::dollar_format(scale = 1e-6, prefix = "$", suffix = "M"), breaks = seq(0, 300000000, 50000000))
 ```
 
-#### Scatter Plot
+Based on the bar chart above, the New York Mets, Los Angeles Dodgers, and New York Yankees have the highest expenditure on their players. This aligns with general expectations, as these teams are renowned for operating in larger markets and possessing greater financial resources than most other teams. On the opposite end, the Oakland Athletics, Cincinnati Reds, and Baltimore Orioles are among the teams with the lowest player expenditures. This outcome is not surprising. Notably, the Oakland Athletics are historically associated with "Moneyball"—a strategy where they leveraged statistical analysis to identify undervalued players and achieve competitive performance on a limited budget, rather than solely relying on traditional scouting methods.
+
+### Scatter Plot
+Scatter plots are helpful in illustrating the overarching trend between two continuous variables. In our context, we are particularly interested in examining the relationship between payroll amounts and win percentages. Consequently, we will create a scatter plot for these variables, accompanies by a line of best fit, to discern any significant correlation or trend between them.
 
 ```{r scatter plot, warning=FALSE, message=FALSE}
-ggplot(payrollData, aes(x=total, y=winPercentage)) +
-  geom_point(color="blue") +
-  geom_smooth(method=lm) +
-  labs(x="Total Payroll", y="Win %", title="Total Payroll vs Win Percentage") +
+ggplot(payrollData, aes(x=normalized, y=winPercentage)) +
+  geom_point(color="#002D72") +
+  geom_smooth(method=lm, color="#D50032") +
+  labs(x="26-Man Payroll", y="Win %", title="26-Man Payroll vs Win Percentage") +
   scale_x_continuous(labels = scales::dollar_format(scale = 1e-6, prefix = "$", suffix = "M"), breaks = seq(0, 300000000, 50000000))
 ```
 
-# Analysis
-### Above average pay and wins
-We'll first look at a list of teams that had both above average payroll and above average winning percentages.
+From the given graph, it is evident that there is a positive association between the 26-Man Payroll and Win Percentages. This suggests that teams with higher expenditures on their players generally exhibit superior on-field results. However, the visual representation alone does not quantify the strength of this relationship. To precisely gauge this association, we will proceed with a correlation analysis on these two variables.
+
+```{r correlation analysis}
+library(broom)
+corrtest <- cor.test(payrollData$normalized, payrollData$winPercentage, method="pearson")
+tidy(corrtest)
+```
+From the above result, the correlation coefficient is 0.721, which indicates a strong positive relationship between the two variables. In other words, as 26-man payroll increases, the win percentage tends to increase as well. Additionally, given that the p-value of this estimate is 6.959e-06, which is substantially below conventional significance levels (0.5, 0.1, 0.05, 0.01), we can confidently assert that this correlation is statistically significant. This implies that the observed correlation coefficient is not a mere coincidence but rather an indicative measure of an underlying association between the variables.
+
+However, it is crucial to note that correlation does not imply causation. While there is a strong correlation between payroll and team performance, it does not necessarily mean that higher payrolls directly cause better performances. To draw causal inferences, we would need to consider additional assumptions and employ different analytical methodologies.
+
+# Additional Topical Analysis
+Building on the insights from our initial exploratory data analysis, we will now undertake a more detailed examination of the topics of our interest.
+
+## Above Average Pay and Wins
+Firstly, we will examine teams that distinguished themselves with both above-average payrolls and superior winning percentages.
 
 ```{r}
 payrollData %>%
@@ -154,10 +244,10 @@ payrollData %>%
   kable()
 ```
 
-There were seven total teams that had both an above average payroll and an above average winning percentage. One thing to notice is that all three of the highest payrolls had above average winning percentages. 
+Seven teams stood out with both above-average payrolls and winning percentages. Notably, among these, the top three highest-paying teams all showed superior winning percentages.
 
-### Below average pay and below average wins
-Much like above, we'll look at teams that had below average payroll and wins.
+## Below Average Pay and Wins
+Similarly, we will look at teams that had both below-average payrolls and wins.
 
 ```{r}
 payrollData %>%
@@ -166,23 +256,25 @@ payrollData %>%
   kable()
 ```
 
-Interestingly, there were nine teams with both a below average payroll and a below average winning percentage. However unlike with the teams that were above average in both of the aforementioned categories, there is much more of a spread in terms of rankings among these teams. For example, the Baltimore Orioles had the lowest payroll across the entire MLB, yet still won an above average amount of games, winning about 52% of the games they played in the season. With that being said, most of the below average teams did also have lower payrolls, such as the dreadful Washington Nationals who had the 10th lowest payroll and finished dead last, winning barely over a third of their games. 
+Interestingly, there were nine teams with both below-average payrolls and winning percentages. Contrasting with the teams that excelled in both payroll and victories, these teams displayed a broader range in their standings. For example, despite the Baltimore Orioles having the lowest payroll in the MLB, they secured victories in approximately 52% of their season's matches, surpassing the average win rate. However, itius evident that a majority of the teams falling below the average in performance also operated on modest budgets. For instance, the Washington Nationals, with the 10th lowest payroll, found themselves at the bottom of the league, winning just over a third of their matches.
 
-### Teams that were "unlucky"
-One unpredictable element of sports is injuries. Sometimes teams can get very unlucky with injuries and have some of their best players (who are generally the highest paid) have long term injuries in which they're unable to play for large amounts of the season. When players are injured, they can be placed on the injured reserve list, freeing up a roster spot for another player who is healthy to take their place. We'll compare the percentage of payroll that goes towards injured reserve players to a team's total winning percentage. 
+## Teams That Were "Unlucky"
+In sports, injuries introduce an element of unpredictability. Teams can occasionally face the misfortune of their best-performaing players, often the highest earners, having long-term injuries, sidelining them for significant portions of the season. In such instances, these players are placed to the injured reserve list, freeing up a roster spot for another player to replace their roster position. Our analysis will compare the proportion of a team's payroll allocated to players on the injured reserve against the team's overall winning percentage.
+
+
 ```{r warning = FALSE, message = FALSE}
 payrollData %>%
   summarize(pctIR = injuredReserve / total) %>%
   ggplot(aes(x=pctIR, y = payrollData$winPercentage)) +
-  geom_point(color="blue") +
-  geom_smooth(method=lm) +
+  geom_point(color="#002D72") +
+  geom_smooth(method=lm, color="#D50032") +
   labs(x="% of Payroll Towards Injured Reserve", y="Win %", title="Injured Reserve Payroll vs Win Percentage")
 ```
 
-There appears to be a weak negative correlation between injured reserve utilization and win percentage. With that being said, the trend line is downward sloping, so there is at least some indication that having more of your payroll going towards injured reserve players can lead to poorer performance. 
+There appears to be a slight negative corrleation between injured reserve utilization and win percentage. The downward-sloping trend line suggests that having a higher proportion of a team's payroll going towards players on the injured reserve could be linked to poorer performance on the field.
 
-### What defines success?
-Throughout this exploration, we've primarily defined success in terms of winning percentage. However, is this the best metric to use? While having the most wins in the regular season is great, history remembers championship wins, rather than regular season wins. The Houston Astros won the 2022 MLB World Series over the Philadelphia Phillies. 
+## What Defines Success?
+In our analysis thus far, we have primarily defined success in terms of winning percentage. Yet, is this the best metric for gauging success? While having the most wins during the regular season is great, it is championship wins that record a team's legacy in history. Notably, the Houston Astros won the 2022 MLB World Series, beating the Philadelphia Phillies. The Phillies, despite not securing the regular season title, became National League champions and advanced to the World Series. Furthermore, teams that dominated the regular season, such as the Los Angeles Dodgers and Atlanta Braves, did not even advance to the Championship Series.
 
 ```{r}
 payrollData %>%
@@ -190,8 +282,7 @@ payrollData %>%
   kable()
 ```
 
-While this table may not be the most exciting, it does provide some valuable insight: The richest teams (i.e. the ones that spend the most money on their players) are far from guaranteed to be the most successful at winning a World Series. Neither of the two finalists were in the top 3 highest payrolls for the season, with the eventual champion Astros being eighth overall, which is very much in the middle of the pack considering that there are only 30 teams in the league. 
+While the given table might not seem the most interesting, it offers some valuable insights. Specifically, having the richest team and investing a lot of money on players does not necessarily guarantee the World Series title. Neither of the finalists featured in the season's top three highest payrolls. The champion Astros, ranking eighth, were essentially mid-tier, given that there are 30 teams in the league.
 
 # Further Research
-
-In terms of further research, we think that it would be very interesting to consider more seasons in our studies. While it appears that payroll wasn't the defining factor in the 2022 season, we'd like to take a look at more seasons to see if over time there has been an impact or if there are any other trends that would be amplified by more data. Something else to consider is the 2020 season. This was a shortened season due to the COVID-19 pandemic, so it would be interesting to see if there was any advantage to playing less games and which types of teams this benefited the most and least. 
+For future studies, it would be interesting to encompass multiple seasons in our analysis. While the 2022 season suggests that payroll might not be the sole determinant of success, expanding the scope could reveal long-term impacts or other trends. Specifically, the 2020 season, shortened due to the COVID-19 pandemic, needs special attention. Evaluating this unique season might shed light on whether reduced gameplay gave advantages and, if so, which types of teams benefited or suffered the most. However, as we delve deeper into these analyses, it is crucial to remember that identifying patterns does not necessarily infer causality. To draw robust causal conclusions, a more rigorous framework, encompassing control variables and potential confounders, would be necessary.
