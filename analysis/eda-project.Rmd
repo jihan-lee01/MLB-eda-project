@@ -26,9 +26,18 @@ To initiate our comprehensive analysis of the 2022 MLB Team Payroll, we should s
 ```{r import datasets, warning=FALSE}
 library('readxl')
 
-payrollPosition <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_2022.xlsx")
+payrollPosition18 <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_2018.xlsx")
+payrollPosition19 <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_2019.xlsx")
+payrollPosition21 <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_2021.xlsx")
+payrollPosition22 <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_2022.xlsx")
+payrollPosition23 <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_2023.xlsx")
 
-payrollRoster <- read_excel("../data/mlb_payroll_tracker_roster_breakdown_2022.xlsx")
+
+payrollRoster18 <- read_excel("../data/mlb_payroll_tracker_roster_breakdown_2018.xlsx")
+payrollRoster19 <- read_excel("../data/mlb_payroll_tracker_roster_breakdown_2019.xlsx")
+payrollRoster21 <- read_excel("../data/mlb_payroll_tracker_roster_breakdown_2021.xlsx")
+payrollRoster22 <- read_excel("../data/mlb_payroll_tracker_roster_breakdown_2022.xlsx")
+payrollRoster23 <- read_excel("../data/mlb_payroll_tracker_roster_breakdown_2023.xlsx")
 ```
 
 The data is derived from two distinct but similar datasets, each structured around the 30 MLB teams. The `payrollPosition` dataset breaks down payroll according to various defensive position groupings, whereas the `payrollRoster` dataset categorizes payroll based on different roster classifications.
@@ -40,24 +49,62 @@ In our data pre-processing, we have identified a specific entry labeled `LEAGUE 
 library('tidyverse')
 library('knitr')
 
-payrollRoster <- payrollRoster %>%
-  filter(RANK != 'LEAGUE AVERAGE')
+filterPayrollRoster <- function(dataFrame) {
+  filteredDataFrame <- dataFrame %>%
+    filter(RANK != 'LEAGUE AVERAGE')
+  return(filteredDataFrame)
+}
+
+payrollRoster18 <- filterPayrollRoster(payrollRoster18)
+payrollRoster19 <- filterPayrollRoster(payrollRoster19)
+payrollRoster21 <- filterPayrollRoster(payrollRoster21)
+payrollRoster22 <- filterPayrollRoster(payrollRoster22)
+payrollRoster23 <- filterPayrollRoster(payrollRoster23)
 ```
 
 The subsequent task is combining the two datasets to yield a singular dataset `payrollData`. To merge two datasets, we will use the `full_join()` method. However, prior to this integration, it is important to address an inconsistency: the `RANK` variable within the `payrollRoster` dataset is currently represented as a decimal number.Thus, we will transform the `RANK` variable to an integer format.
 
 ```{r merge datasets}
-payrollRoster$RANK <- as.integer(payrollRoster$RANK)
-payrollData <- full_join(payrollPosition, payrollRoster, by = c('TEAM', 'RANK', 'ROSTER'))
+payrollRoster18$RANK <- as.integer(payrollRoster18$RANK)
+payrollRoster19$RANK <- as.integer(payrollRoster19$RANK)
+payrollRoster21$RANK <- as.integer(payrollRoster21$RANK)
+payrollRoster22$RANK <- as.integer(payrollRoster22$RANK)
+payrollRoster23$RANK <- as.integer(payrollRoster23$RANK)
+
+payrollData18 <- full_join(payrollPosition18, payrollRoster18, by = c('TEAM', 'RANK', 'ROSTER'))
+payrollData19 <- full_join(payrollPosition19, payrollRoster19, by = c('TEAM', 'RANK', 'ROSTER'))
+payrollData21 <- full_join(payrollPosition21, payrollRoster21, by = c('TEAM', 'RANK', 'ROSTER'))
+payrollData22 <- full_join(payrollPosition22, payrollRoster22, by = c('TEAM', 'RANK', 'ROSTER'))
+payrollData23 <- full_join(payrollPosition23, payrollRoster23, by = c('TEAM', 'RANK', 'ROSTER'))
+
+payrollData18$year <- 2018
+payrollData19$year <- 2019
+payrollData21$year <- 2021
+payrollData22$year <- 2022
+payrollData23$year <- 2023
+
+payrollData18 <- payrollData18 %>% rename('total'='2018 TOTAL PAYROLL')
+payrollData19 <- payrollData19 %>% rename('total'='2019 TOTAL PAYROLL')
+payrollData21 <- payrollData21 %>% rename('total'='2021 TOTAL PAYROLL')
+payrollData22 <- payrollData22 %>% rename('total'='2022 TOTAL PAYROLL')
+payrollData23 <- payrollData23 %>% rename('total'='2023 TOTAL PAYROLL')
+
+payrollData18 <- payrollData18 %>% rename('normalized'='25-MAN PAYROLL')
+payrollData19 <- payrollData19 %>% rename('normalized'='25-MAN PAYROLL')
+payrollData21 <- payrollData21 %>% rename('normalized'='26-MAN PAYROLL')
+payrollData22 <- payrollData22 %>% rename('normalized'='26-MAN PAYROLL')
+payrollData23 <- payrollData23 %>% rename('normalized'='26-MAN PAYROLL')
+
+payrollData <- rbind(payrollData18, payrollData19, payrollData21, payrollData22, payrollData23)
 ```
 
 We will now clean up the data further by eliminating variables that are named differently but are essentially duplicates of each other.
 
 ```{r select variables}
 payrollData <- payrollData %>%
-  select('RANK', 'TEAM', 'WIN %', 'ROSTER', 'CATCHER $',
+  select('year', 'RANK', 'TEAM', 'WIN %', 'ROSTER', 'CATCHER $',
          'INFIELD $', 'OUTFIELD $', 'DH $', 'PITCHING $',
-         'TOTAL PAYROLL', '26-MAN PAYROLL', 'INJURED RESERVE', 'RETAINED', 'BURIED')
+         'total', 'normalized', 'INJURED RESERVE', 'RETAINED', 'BURIED')
 ```
 
 For the purpose of ensuring consistency and facilitating subsequent analysis, we will standardize the naming of variables. To achieve this, we have adopted the camelCase naming convention.
@@ -74,12 +121,23 @@ payrollData <- payrollData %>%
     outfield = 'OUTFIELD $',
     dh = 'DH $',
     pitching = 'PITCHING $',
-    total = 'TOTAL PAYROLL',
-    normalized = '26-MAN PAYROLL',
     injuredReserve = 'INJURED RESERVE',
     retained = 'RETAINED',
     buried = 'BURIED'
   )
+```
+
+
+```{r inflation adjustment, message=FALSE, warning=FALSE}
+cpi <- read_csv("../data/CPIAUCSL.csv")
+cpi <- cpi %>% rename(date = 'DATE', index = 'CPIAUCSL_NBD20230101')
+cpi$index <- as.double(cpi$index)
+
+cpi <- cpi %>%
+  filter(format(as.Date(date), "%m-%d") == "01-01") %>%
+  mutate(date = format(as.Date(date), "%Y"))
+
+baseIndex <- cpi[cpi$date==2023, 'index']
 ```
 
 To ensure data integrity and consistency, it is necessary to verify that each variable is of the appropriate class. The `sapply()` method provides a concise display for this purpose.
@@ -91,6 +149,7 @@ Upon examining the output, it is evident that most variables align with their ex
 
 ```{r change variable class, warning=FALSE}
 payrollData$dh <- as.numeric(payrollData$dh)
+payrollData$injuredReserve <- as.numeric(payrollData$injuredReserve)
 ```
 
 ## Overview of Varibales
@@ -101,7 +160,7 @@ As we have pre-processed the data, we can now delve deeper into understanding th
 * `winPercentage`: Shows the proportion of games won by the team during the 2022 regular season.
 * `roster`: Quantifies the total number of players within the team's roster.
 * `total`: Reflects the total amount of salary spent by the team towards their roster for the year.
-* `normalized`: Signifies the amount of salary associated with the team's 26-man roster, ensuring a normalized payroll comparison irrespective of the total roster size.
+* `normalized`: Signifies the amount of salary associated with the team's 25-man or 26-man roster, ensuring a normalized payroll comparison irrespective of the total roster size.
 
 ## Central Tendency Measures and Descriptive Statistics
 
