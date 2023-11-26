@@ -25,6 +25,8 @@ To initiate our comprehensive analysis of the 2022 MLB Team Payroll, we should s
 
 ```{r import datasets, warning=FALSE}
 library('readxl')
+library('tidyverse')
+library('knitr')
 
 payrollPosition18 <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_2018.xlsx")
 payrollPosition19 <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_2019.xlsx")
@@ -46,9 +48,6 @@ The data is derived from two distinct but similar datasets, each structured arou
 In our data pre-processing, we have identified a specific entry labeled `LEAGUE AVERAGE` within the `payrollRoster` dataset. While this entry provides a valuable benchmark by offering an average across the league, its inclusion may introduce ambiguity, especially when conducting team-specific analyses. To ensure the clarity of our data and to avoid potential misinterpretations or skewness in subsequent analyses, we eliminated this entry. By doing so, we aim to maintain a dataset that solely represents individual team figures.
 
 ```{r filter, warning=FALSE, message=FALSE}
-library('tidyverse')
-library('knitr')
-
 filterPayrollRoster <- function(dataFrame) {
   filteredDataFrame <- dataFrame %>%
     filter(RANK != 'LEAGUE AVERAGE')
