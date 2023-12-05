@@ -1,0 +1,283 @@
+---
+title: "Research"
+author: "Calvin Brauer, Jihan Lee"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: simplex
+    toc: true
+    toc_float:
+      collapsed: true
+    number_sections: true
+    code_folding: show
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data
+
+```{r import datasets, warning=FALSE, message=FALSE}
+library('readxl')
+library('tidyverse')
+library('knitr')
+
+payrollPosition18 <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_2018.xlsx")
+payrollPosition19 <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_2019.xlsx")
+payrollPosition21 <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_2021.xlsx")
+payrollPosition22 <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_2022.xlsx")
+payrollPosition23 <- read_excel("../data/mlb_payroll_tracker_positional_breakdown_2023.xlsx")
+
+payrollRoster18 <- read_excel("../data/mlb_payroll_tracker_roster_breakdown_2018.xlsx")
+payrollRoster19 <- read_excel("../data/mlb_payroll_tracker_roster_breakdown_2019.xlsx")
+payrollRoster21 <- read_excel("../data/mlb_payroll_tracker_roster_breakdown_2021.xlsx")
+payrollRoster22 <- read_excel("../data/mlb_payroll_tracker_roster_breakdown_2022.xlsx")
+payrollRoster23 <- read_excel("../data/mlb_payroll_tracker_roster_breakdown_2023.xlsx")
+```
+
+## Pre-processing
+
+```{r filter, warning=FALSE, message=FALSE}
+filterPayrollRoster <- function(dataFrame) {
+  filteredDataFrame <- dataFrame %>%
+    filter(RANK != 'LEAGUE AVERAGE')
+  return(filteredDataFrame)
+}
+
+rosterNames <- c("payrollRoster18", "payrollRoster19", "payrollRoster21", "payrollRoster22", "payrollRoster23")
+
+for (name in rosterNames) {
+  assign(name, filterPayrollRoster(get(name)))
+}
+```
+
+```{r clean and merge datasets, warning=FALSE}
+payrollRosterList <- list(payrollRoster18, payrollRoster19, payrollRoster21, payrollRoster22, payrollRoster23)
+payrollPositionList <- list(payrollPosition18, payrollPosition19, payrollPosition21, payrollPosition22, payrollPosition23)
+
+payrollDataNames <- c("payrollData18", "payrollData19", "payrollData21", "payrollData22", "payrollData23")
+
+for (i in 1:length(payrollRosterList)) {
+  payrollRosterList[[i]]$RANK <- as.integer(payrollRosterList[[i]]$RANK)
+
+  payrollData <- full_join(payrollPositionList[[i]], payrollRosterList[[i]], by = c('TEAM', 'RANK', 'ROSTER'))
+  
+  assign(payrollDataNames[i], payrollData)
+}
+
+payrollData18$year <- 2018
+payrollData19$year <- 2019
+payrollData21$year <- 2021
+payrollData22$year <- 2022
+payrollData23$year <- 2023
+
+payrollData18 <- payrollData18 %>% rename('total'='2018 TOTAL PAYROLL')
+payrollData19 <- payrollData19 %>% rename('total'='2019 TOTAL PAYROLL')
+payrollData21 <- payrollData21 %>% rename('total'='2021 TOTAL PAYROLL')
+payrollData22 <- payrollData22 %>% rename('total'='2022 TOTAL PAYROLL')
+payrollData23 <- payrollData23 %>% rename('total'='2023 TOTAL PAYROLL')
+
+payrollData18 <- payrollData18 %>% rename('normalized'='25-MAN PAYROLL')
+payrollData19 <- payrollData19 %>% rename('normalized'='25-MAN PAYROLL')
+payrollData21 <- payrollData21 %>% rename('normalized'='26-MAN PAYROLL')
+payrollData22 <- payrollData22 %>% rename('normalized'='26-MAN PAYROLL')
+payrollData23 <- payrollData23 %>% rename('normalized'='26-MAN PAYROLL')
+
+payrollData <- rbind(payrollData18, payrollData19, payrollData21, payrollData22, payrollData23)
+```
+
+```{r select variables}
+payrollData <- payrollData %>%
+  select('year', 'RANK', 'TEAM', 'WIN %', 'ROSTER', 'CATCHER $',
+         'INFIELD $', 'OUTFIELD $', 'DH $', 'PITCHING $',
+         'total', 'normalized', 'INJURED RESERVE', 'RETAINED', 'BURIED')
+```
+
+```{r rename variables}
+payrollData <- payrollData %>%
+  rename(
+    rank = 'RANK',
+    team = 'TEAM',
+    winPercentage = 'WIN %',
+    roster = 'ROSTER',
+    catcher = 'CATCHER $', 
+    infield = 'INFIELD $',
+    outfield = 'OUTFIELD $',
+    dh = 'DH $',
+    pitching = 'PITCHING $',
+    injuredReserve = 'INJURED RESERVE',
+    retained = 'RETAINED',
+    buried = 'BURIED'
+  )
+```
+
+```{r rename values}
+payrollData <- payrollData %>%
+  mutate(team = ifelse(team == "Cleveland Indians", "Cleveland Guardians", team))
+```
+
+```{r change variable class, warning=FALSE}
+payrollData$dh <- as.numeric(payrollData$dh)
+payrollData$injuredReserve <- as.numeric(payrollData$injuredReserve)
+```
+
+```{r inflation adjustment, message=FALSE, warning=FALSE}
+cpi <- read_csv("../data/CPIAUCSL.csv")
+
+cpi <- cpi %>% rename(date = 'DATE', index = 'CPIAUCSL_NBD20230101')
+cpi$index <- as.double(cpi$index)
+
+cpi <- cpi %>%
+  filter(format(as.Date(date), "%m-%d") == "01-01") %>%
+  mutate(date = format(as.Date(date), "%Y"))
+
+baseIndex <- cpi[cpi$date==2023, 'index']
+
+infl1823 <- baseIndex / cpi[cpi$date==2018, 'index']
+infl1923 <- baseIndex / cpi[cpi$date==2019, 'index']
+infl2123 <- baseIndex / cpi[cpi$date==2021, 'index']
+infl2223 <- baseIndex / cpi[cpi$date==2022, 'index']
+infl2323 <- baseIndex / cpi[cpi$date==2023, 'index']
+
+inflFactors <- c('2018' = infl1823, '2019' = infl1923, '2021' = infl2123, '2022' = infl2223, '2023' = infl2323)
+inflFactors <- unlist(inflFactors)
+
+payrollData <- payrollData %>%
+  mutate(
+    across(c(catcher, infield, outfield, dh, pitching, total, normalized, injuredReserve, retained, buried),
+           ~ .x * sapply(year, function(y) inflFactors[paste0(y, ".index")]))
+  )
+```
+
+# Research
+
+## Augmented Dickey–Fuller (ADF) Test
+
+```{r adf test, message=FALSE, warning=FALSE}
+library(tseries)
+adf.test(payrollData$winPercentage)
+adf.test(payrollData$total)
+```
+
+## Granger Causality Test
+
+```{r Granger causality test, message=FALSE}
+library(lmtest)
+teams <- unique(payrollData$team)
+grangerResults1 <- list()
+grangerResults2 <- list()
+
+for (team in teams) {
+  teamData <- payrollData %>% filter(team == !!team)
+  
+  grangerResults1[[team]] <- grangertest(winPercentage ~ total, data = teamData, order = 1)
+  grangerResults2[[team]] <- grangertest(total ~ winPercentage, data = teamData, order = 1)
+}
+
+extractPValue <- function(testResult) {
+  testResult$`Pr(>F)`[2]
+}
+
+library(purrr)
+
+summaryTable <- tibble(
+  team = teams,
+  result1P = map_dbl(grangerResults1, extractPValue),
+  result2P = map_dbl(grangerResults2, extractPValue)
+)
+
+summaryTable
+```
+
+## Visualization of the Test Result
+
+```{r visualization of result, message=FALSE}
+library(reshape2)
+
+longSummaryTable <- melt(summaryTable, id.vars = "team", variable.name = "test", value.name = "p_value")
+
+threshold <- 0.05
+longSummaryTable <- longSummaryTable %>% 
+  mutate(significant = ifelse(p_value < threshold, p_value, NA))
+
+ggplot(longSummaryTable, aes(x = test, y = team, fill = p_value))+
+  geom_tile() +
+  scale_fill_gradient(low = "#D50032", high = "white", 
+                      name = "p-value",
+                      limits = c(NA, max(longSummaryTable$p_value, na.rm = TRUE))) +
+  labs(title = "Granger Causality Test Results", x = "Test", y = "Team") +
+  scale_x_discrete(labels = c("result1P" = "Payroll -> Win%", 
+                              "result2P" = "Win% -> Payroll")) +
+  scale_y_discrete(labels = c("Washington Nationals" = "Nationals", 
+                              "Toronto Blue Jays" = "Blue Jays",
+                              "Texas Rangers" = "Rangers",
+                              "Tampa Bay Rays" = "Rays",
+                              "St. Louis Cardinals" = "Cardinals",
+                              "Seattle Mariners" = "Mariners",
+                              "San Francisco Giants" = "Giants",
+                              "San Diego Padres" = "Padres",
+                              "Pittsburgh Pirates" = "Pirates",
+                              "Philadelphia Phillies" = "Phillies",
+                              "Oakland Athletics" = "Athletics",
+                              "New York Yankees" = "Yankees",
+                              "New York Mets" = "Mets",
+                              "Minnesota Twins" = "Twins",
+                              "Milwaukee Brewers" = "Brewers",
+                              "Miami Marlins" = "Marlins",
+                              "Los Angeles Dodgers" = "Dodgers",
+                              "Los Angeles Angels" = "Angels",
+                              "Kansas City Royals" = "Royals",
+                              "Houston Astros" = "Astros",
+                              "Detroit Tigers" = "Tigers",
+                              "Colorado Rockies" = "Rockies",
+                              "Cleveland Guardians" = "Guardians",
+                              "Cincinnati Reds" = "Reds",
+                              "Chicago White Sox" = "White Sox",
+                              "Chicago Cubs" = "Cubs",
+                              "Boston Red Sox" = "Red Sox",
+                              "Baltimore Orioles" = "Orioles",
+                              "Atlanta Braves" = "Braves",
+                              "Arizona Diamondbacks" = "Diamondbacks"))
+
+ggplot(longSummaryTable, aes(x = test, y = team, fill = significant)) +
+  geom_tile() +
+  scale_fill_gradientn(colors = c("#D50032", "white"), 
+                       na.value = "gray", 
+                       name = "p-value",
+                       limits = c(NA, max(longSummaryTable$p_value, na.rm = TRUE))) +
+  labs(title = "Granger Causality Test Results (Significant Results Highlighted)", x = "Test", y = "Team") +
+  scale_x_discrete(labels = c("result1P" = "Payroll -> Win%", 
+                              "result2P" = "Win% -> Payroll")) +
+  scale_y_discrete(labels = c("Washington Nationals" = "Nationals", 
+                              "Toronto Blue Jays" = "Blue Jays",
+                              "Texas Rangers" = "Rangers",
+                              "Tampa Bay Rays" = "Rays",
+                              "St. Louis Cardinals" = "Cardinals",
+                              "Seattle Mariners" = "Mariners",
+                              "San Francisco Giants" = "Giants",
+                              "San Diego Padres" = "Padres",
+                              "Pittsburgh Pirates" = "Pirates",
+                              "Philadelphia Phillies" = "Phillies",
+                              "Oakland Athletics" = "Athletics",
+                              "New York Yankees" = "Yankees",
+                              "New York Mets" = "Mets",
+                              "Minnesota Twins" = "Twins",
+                              "Milwaukee Brewers" = "Brewers",
+                              "Miami Marlins" = "Marlins",
+                              "Los Angeles Dodgers" = "Dodgers",
+                              "Los Angeles Angels" = "Angels",
+                              "Kansas City Royals" = "Royals",
+                              "Houston Astros" = "Astros",
+                              "Detroit Tigers" = "Tigers",
+                              "Colorado Rockies" = "Rockies",
+                              "Cleveland Guardians" = "Guardians",
+                              "Cincinnati Reds" = "Reds",
+                              "Chicago White Sox" = "White Sox",
+                              "Chicago Cubs" = "Cubs",
+                              "Boston Red Sox" = "Red Sox",
+                              "Baltimore Orioles" = "Orioles",
+                              "Atlanta Braves" = "Braves",
+                              "Arizona Diamondbacks" = "Diamondbacks"))
+```
