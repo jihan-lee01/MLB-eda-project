@@ -3,8 +3,6 @@
 ### Authors: Calvin Brauer and Jihan Lee
 This project is a part of the coursework for ENGRD/QTM 302W: Technical Writing taught by Dr. Greg Palermo.
 
-#### -- Project Status: On-Hold
-
 [![Binder](http://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/jihan-lee01/eda-project/HEAD)
 
 ## Project Intro/Objective
